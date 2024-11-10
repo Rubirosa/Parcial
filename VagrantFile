@@ -1,0 +1,76 @@
+Vagrant.configure("2") do |config|
+    # Definir las máquinas virtuales
+    config.vm.define "web1" do |web1|
+      web1.vm.box = "ubuntu/bionic64"  # Caja base de Ubuntu
+      web1.vm.provider "virtualbox" do |vb|
+        vb.memory = "512"
+        vb.cpus = 1
+      end
+      web1.vm.network "private_network", type: "dhcp"
+      web1.vm.network "private_network", ip: "192.168.50.10"
+      
+      # Provisionamiento de Apache
+      web1.vm.provision "shell", inline: <<-SHELL
+        sudo apt-get update
+        sudo apt-get install -y apache2
+        sudo systemctl start apache2
+        sudo systemctl enable apache2
+      SHELL
+  
+      # Carpeta compartida con la máquina local
+      web1.vm.synced_folder "./paginas_web", "/var/www/html"
+    end
+  
+    config.vm.define "web2" do |web2|
+      web2.vm.box = "ubuntu/bionic64"  # Caja base de Ubuntu
+      web2.vm.provider "virtualbox" do |vb|
+        vb.memory = "512"
+        vb.cpus = 1
+      end
+      web2.vm.network "private_network", type: "dhcp"
+      web2.vm.network "private_network", ip: "192.168.50.11"
+      
+      # Provisionamiento de Apache
+      web2.vm.provision "shell", inline: <<-SHELL
+        sudo apt-get update
+        sudo apt-get install -y apache2
+        sudo systemctl start apache2
+        sudo systemctl enable apache2
+      SHELL
+  
+      # Carpeta compartida con la máquina local
+      web2.vm.synced_folder "./paginas_web", "/var/www/html"
+    end
+  
+    config.vm.define "loadbalancer" do |loadbalancer|
+      loadbalancer.vm.box = "ubuntu/bionic64"  # Caja base de Ubuntu
+      loadbalancer.vm.provider "virtualbox" do |vb|
+        vb.memory = "512"
+        vb.cpus = 1
+      end
+      loadbalancer.vm.network "private_network", type: "dhcp"
+      loadbalancer.vm.network "private_network", ip: "192.168.50.20"
+      
+      # Provisionamiento de Nginx como balanceador de carga
+      loadbalancer.vm.provision "shell", inline: <<-SHELL
+        sudo apt-get update
+        sudo apt-get install -y nginx
+        sudo systemctl start nginx
+        sudo systemctl enable nginx
+  
+        # Configuración del balanceo de carga
+        echo 'upstream backend {' | sudo tee /etc/nginx/sites-available/default
+        echo '    server 192.168.50.10;' | sudo tee -a /etc/nginx/sites-available/default
+        echo '    server 192.168.50.11;' | sudo tee -a /etc/nginx/sites-available/default
+        echo '}' | sudo tee -a /etc/nginx/sites-available/default
+        echo 'server {' | sudo tee -a /etc/nginx/sites-available/default
+        echo '    listen 80;' | sudo tee -a /etc/nginx/sites-available/default
+        echo '    location / {' | sudo tee -a /etc/nginx/sites-available/default
+        echo '        proxy_pass http://backend;' | sudo tee -a /etc/nginx/sites-available/default
+        echo '    }' | sudo tee -a /etc/nginx/sites-available/default
+        echo '}' | sudo tee -a /etc/nginx/sites-available/default
+        sudo systemctl restart nginx
+      SHELL
+    end
+  end
+  
